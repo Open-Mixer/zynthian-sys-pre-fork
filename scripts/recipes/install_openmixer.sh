@@ -89,8 +89,6 @@ conf_set() {
 	fi
 }
 
-mkdir -p "$ZYNTHIAN_CONFIG_DIR"
-
 #------------------------------------------------------------------------------
 # Repository and packages
 #------------------------------------------------------------------------------
@@ -149,6 +147,8 @@ fi
 # Zynthian settings
 #------------------------------------------------------------------------------
 
+mkdir -p "$ZYNTHIAN_CONFIG_DIR"
+
 # The envars: zynthian_envars.sh's defaults carry both; this is for a config
 # made before them. Without the file (a new image) update_zynthian_sys.sh
 # copies the defaults and runs this again.
@@ -191,6 +191,15 @@ if ! is_done hostd-conf && command -v plugin-hostd >/dev/null; then
 		done
 	fi
 	mark_done hostd-conf
+fi
+
+# lv2_worker auto handed what the LV2 adapter refuses to mod-host; plugin-hostd
+# 0.19.0 removed it and does not start with it. Not a step done once: a copy
+# that still holds it is changed on every run. mod-host chosen by hand stays.
+if command -v plugin-hostd >/dev/null && [ -f "$PHD_CONF" ] && [ "$(conf_get "$PHD_CONF" lv2_worker)" = auto ]; then
+	conf_set "$PHD_CONF" lv2_worker omx-clap-host
+	change "lv2_worker auto -> omx-clap-host in $PHD_CONF: a plugin the LV2 adapter refuses is reported, never handed to mod-host"
+	phd_changed=1
 fi
 
 # The pin file must exist for plugin-hostd to start: empty until the first sync.

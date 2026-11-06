@@ -93,7 +93,7 @@ assert_defaults() {
 	check "plugin-hostd.conf: require_pins 1" test "$(conf "$PHD_CONF" require_pins)" = 1
 	check "plugin-hostd.conf: pin_mode first-use" test "$(conf "$PHD_CONF" pin_mode)" = first-use
 	# a plugin the LV2 adapter refuses is reported, never handed to mod-host behind the user's back
-	check "plugin-hostd.conf: lv2_worker omx-clap-host" test "$(conf "$PHD_CONF" lv2_worker)" = omx-clap-host
+	check "plugin-hostd.conf: lv2_worker omx-clap-host, never auto" test "$(conf "$PHD_CONF" lv2_worker)" = omx-clap-host
 	check "config/plugin-hostd.conf: lv2_worker omx-clap-host" test "$(conf "$SYS_DIR/config/plugin-hostd.conf" lv2_worker)" = omx-clap-host
 	check "plugin-hostd.conf: pin_file is the sync's ($(conf "$QUALIFY_CONF" pin_file))" \
 		test -n "$(conf "$PHD_CONF" pin_file)" -a "$(conf "$PHD_CONF" pin_file)" = "$(conf "$QUALIFY_CONF" pin_file)"
@@ -181,7 +181,7 @@ reset
 # The envars defaults and plugin-hostd.conf of vangelis before this change
 sed -e 's/^export ZYNTHIAN_MODHOST_BACKEND=.*/export ZYNTHIAN_MODHOST_BACKEND="jack_load"/' \
 	-e '/ZYNTHIAN_PLUGIN_ENGINE/d' "$SYS_DIR/scripts/zynthian_envars.sh" >"$ENVARS"
-printf 'mod_host /usr/local/bin/mod-host\nclap_host omx-clap-host\nlv2_worker omx-clap-host\nrequire_pins 0\nstate_root /run/plugin-hostd\ndescriptor_dir /var/lib/omx/descriptors\n' >"$PHD_CONF"
+printf 'mod_host /usr/local/bin/mod-host\nclap_host omx-clap-host\nlv2_worker auto\nrequire_pins 0\nstate_root /run/plugin-hostd\ndescriptor_dir /var/lib/omx/descriptors\n' >"$PHD_CONF"
 check "before: ZYNTHIAN_MODHOST_BACKEND=jack_load" test "$(envar "$ENVARS" ZYNTHIAN_MODHOST_BACKEND)" = jack_load
 echo "-- update"
 update
@@ -200,6 +200,17 @@ recipe() {
 		>"$work/recipe.log" 2>&1
 	sed -n '/^OpenMixer defaults/,$p' "$work/recipe.log" | sed 's/^/   | /'
 }
+
+echo "-- lv2_worker auto left by an earlier update is changed on every run; mod-host chosen by hand stays"
+sed -i 's/^lv2_worker .*/lv2_worker auto/' "$PHD_CONF"
+update
+check "lv2_worker auto -> omx-clap-host" test "$(conf "$PHD_CONF" lv2_worker)" = omx-clap-host
+check "the update says so" grep -q 'lv2_worker auto -> omx-clap-host' "$work/update.log"
+check "plugin-hostd starts with the changed file" phd_starts
+sed -i 's/^lv2_worker .*/lv2_worker mod-host/' "$PHD_CONF"
+update
+check "lv2_worker mod-host set by hand is kept" test "$(conf "$PHD_CONF" lv2_worker)" = mod-host
+sed -i 's/^lv2_worker .*/lv2_worker omx-clap-host/' "$PHD_CONF"
 
 echo "== a plugin-qualify with no sync yet, then one with it"
 reset
